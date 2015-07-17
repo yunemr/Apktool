@@ -22,6 +22,7 @@ import brut.androlib.res.data.ResPackage;
 import brut.androlib.res.data.ResTable;
 import brut.androlib.res.data.ResUnknownFiles;
 import brut.androlib.res.util.ExtFile;
+import brut.androlib.res.xml.ResXmlPatcher;
 import brut.androlib.src.SmaliBuilder;
 import brut.androlib.src.SmaliDecoder;
 import brut.common.BrutException;
@@ -280,8 +281,11 @@ public class Androlib {
         new File(appDir, APK_DIRNAME).mkdirs();
         buildSources(appDir);
         buildNonDefaultSources(appDir);
+        ResXmlPatcher.fixingPublicAttrsInProviderAttributes(new File(appDir, "AndroidManifest.xml"));
         buildResources(appDir, (Map<String, Object>) meta.get("usesFramework"));
+
         buildLib(appDir);
+        buildLibs(appDir);
         buildCopyOriginalFiles(appDir);
         buildApk(appDir, outFile);
 
@@ -481,7 +485,7 @@ public class Androlib {
             File apkDir = new File(appDir, APK_DIRNAME);
 
             if (apkOptions.debugMode) {
-                mAndRes.remove_application_debug(new File(apkDir, "AndroidManifest.xml").getAbsolutePath());
+                ResXmlPatcher.removeApplicationDebugTag(new File(apkDir,"AndroidManifest.xml"));
             }
 
             if (apkOptions.forceBuildAll || isModified(newFiles(APK_MANIFEST_FILENAMES, appDir),
@@ -513,15 +517,24 @@ public class Androlib {
         }
     }
 
-    public void buildLib(File appDir)
-            throws AndrolibException {
-        File working = new File(appDir, "lib");
-        if (!working.exists()) {
+    public void buildLib(File appDir) throws AndrolibException {
+        buildLibrary(appDir, "lib");
+    }
+
+    public void buildLibs(File appDir) throws AndrolibException {
+        buildLibrary(appDir, "libs");
+    }
+
+    public void buildLibrary(File appDir, String folder) throws AndrolibException {
+        File working = new File(appDir, folder);
+
+        if (! working.exists()) {
             return;
         }
-        File stored = new File(appDir, APK_DIRNAME + "/lib");
+
+        File stored = new File(appDir, APK_DIRNAME + "/" + folder);
         if (apkOptions.forceBuildAll || isModified(working, stored)) {
-            LOGGER.info("Copying libs...");
+            LOGGER.info("Copying libs... (/" + folder + ")");
             try {
                 OS.rmdir(stored);
                 OS.cpdir(working, stored);
